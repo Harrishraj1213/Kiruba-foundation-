@@ -166,6 +166,23 @@ details p{padding:0 48px 22px 4px;color:var(--muted)}
 .empty{margin-top:36px;padding:24px;border:2px dashed var(--line);border-radius:18px}
 .empty p{margin-top:8px;color:var(--muted)}
 .note{font-size:.88rem;color:var(--muted)}
+/* jobs */
+#jobs{display:grid;gap:18px;margin-top:24px}
+.job{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:26px}
+.jmeta{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 14px}
+.jtag{background:var(--tint);border-radius:999px;padding:4px 14px;font-weight:700;font-size:.9rem}
+.jtag.warn{background:var(--sun);color:#fff}
+.job p{white-space:pre-line}
+.job .req{margin-top:12px;color:var(--muted)}
+.job .req b{color:var(--ink)}
+.jrow{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:20px}
+.btn.ghost{background:transparent;color:var(--ink)}
+.admin{background:var(--tint);border-radius:22px;padding:28px;margin-top:32px}
+.admin h3{margin-bottom:6px}
+.admin form{margin-top:16px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:600px){.two{grid-template-columns:1fr}}
+select{font:400 1rem var(--body);color:var(--ink);background:var(--bg);border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;width:100%}
 /* contact */
 .contact{background:var(--tint)}
 form{display:grid;gap:16px;background:var(--surface);padding:28px;border-radius:20px;border:1px solid var(--line)}
@@ -368,13 +385,20 @@ footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
     <p class="lede">Join people who work with farmers and communities in Oddanchatram on agriculture, education, health and the wellbeing of women and children.</p>
   </div>
 </section>
+<section id="openings" style="padding-top:0">
+  <div class="wrap">
+    <h2>Current openings</h2>
+    <div id="jobs"></div>
+    <div id="admin"></div>
+  </div>
+</section>
 <section style="padding-top:0">
   <div class="wrap split">
     <div>
       <h2>Where would you like to contribute?</h2>
       <p class="lede">Choose the areas that interest you. They are added to your message automatically.</p>
       <div class="chips" id="chips" style="margin-top:24px"><button type="button" class="chip" aria-pressed="false">Sustainable agriculture</button><button type="button" class="chip" aria-pressed="false">Waste-to-resource</button><button type="button" class="chip" aria-pressed="false">Farmer training</button><button type="button" class="chip" aria-pressed="false">Community development</button><button type="button" class="chip" aria-pressed="false">Women and children</button><button type="button" class="chip" aria-pressed="false">Education and health</button><button type="button" class="chip" aria-pressed="false">FPO and agribusiness</button></div>
-      <div class="empty"><h3>Current openings</h3><p>See the roles we are hiring for right now. If nothing fits, you can still send your details and tell us how you would like to help.</p><a class="btn pri" style="margin-top:16px" href="https://claude.ai/artifact/1VjJ3coRTq5o2PdpSoFZUT" target="_blank" rel="noopener">View current openings</a></div>
+      
     </div>
     <form id="cform" novalidate>
       <label for="cn">Your name<input id="cn" autocomplete="name" required><span class="err" id="e-cn"></span></label>
@@ -472,16 +496,93 @@ footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
   $("#name").addEventListener("input",function(){$("#e-name").textContent=""});
   $("#msg").addEventListener("input",function(){$("#e-msg").textContent=""});
 
+
+  // ---- job openings: shown from jobs.json in this website's GitHub repository ----
+  var JOBS,SHA=null,KEY=null,manage=false,loaded=false,authed=false,adminMsg="";
+  try{KEY=localStorage.getItem("kf_key")}catch(e){}
+  function mk(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
+  function isClosed(j){return !!j.last&&new Date(j.last+"T23:59:59")<new Date()}
+  function fmtD(d){try{return new Date(d+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"long",year:"numeric"})}catch(e){return d}}
+  function repoInfo(){var host=location.hostname;if(!/\.github\.io$/.test(host))return null;var p=location.pathname.split("/").filter(Boolean);return {owner:host.split(".")[0],repo:(p.length&&!/\.html?$/.test(p[0]))?p[0]:host}}
+  function api(path,opt){var r=repoInfo();opt=opt||{};opt.headers={Authorization:"Bearer "+KEY,Accept:"application/vnd.github+json"};return fetch("https://api.github.com/repos/"+r.owner+"/"+r.repo+path,opt)}
+  function dec(b){return decodeURIComponent(escape(atob(b.replace(/\s/g,""))))}
+  function enc(t){return btoa(unescape(encodeURIComponent(t)))}
+  function loadJobs(){
+    fetch("jobs.json?t="+Date.now(),{cache:"no-store"}).then(function(r){if(r.status===404)return {jobs:[]};if(!r.ok)throw 0;return r.json()})
+    .then(function(d){if(authed)return;JOBS=Array.isArray(d.jobs)?d.jobs:[];drawJobs()}).catch(function(){if(authed)return;JOBS=null;drawJobs()})}
+  function jobCard(j){
+    var a=mk("article","job"),open=!isClosed(j),adm=manage&&authed;
+    a.appendChild(mk("h3","",j.title));
+    var meta=mk("div","jmeta");
+    if(j.loc)meta.appendChild(mk("span","jtag",j.loc));
+    if(j.type)meta.appendChild(mk("span","jtag",j.type));
+    if(j.last)meta.appendChild(mk("span","jtag"+(open?"":" warn"),open?"Apply by "+fmtD(j.last):"Closed"));
+    a.appendChild(meta);a.appendChild(mk("p","",j.desc));
+    if(j.req){var r=mk("p","req");r.appendChild(mk("b","","Requirements: "));r.appendChild(document.createTextNode(j.req));a.appendChild(r)}
+    var row=mk("div","jrow");
+    if(open){var l=mk("a","btn pri","Apply by email");l.href="mailto:"+EMAIL+"?subject="+encodeURIComponent("Application: "+j.title)+"&body="+encodeURIComponent("Name:\nPhone:\n\nPlease attach your resume.");row.appendChild(l)}
+    if(adm){var d=mk("button","btn ghost","Remove this job");d.type="button";d.onclick=function(){if(confirm("Remove \u201c"+j.title+"\u201d?")){d.disabled=true;save(JOBS.filter(function(x){return x.id!==j.id}))}};row.appendChild(d)}
+    a.appendChild(row);return a}
+  function drawJobs(){
+    var box=$("#jobs");if(!box)return;box.textContent="";
+    if(JOBS===undefined){box.appendChild(mk("p","lede","Loading openings\u2026"));return}
+    if(JOBS===null){var e0=mk("div","empty");e0.appendChild(mk("h3","","Openings could not be loaded"));e0.appendChild(mk("p","","Please try again in a moment, or write to us at "+EMAIL+"."));box.appendChild(e0);return}
+    var list=(manage&&authed)?JOBS:JOBS.filter(function(j){return !isClosed(j)});
+    if(!list.length){var e=mk("div","empty");e.appendChild(mk("h3","","No openings right now"));e.appendChild(mk("p","","New roles will be posted here. You can also send your details below and tell us how you would like to help."));box.appendChild(e);return}
+    list.forEach(function(j){box.appendChild(jobCard(j))})}
+  async function save(list){
+    try{
+      var body={message:"Update job openings",content:enc(JSON.stringify({jobs:list},null,1)+"\n"),branch:"main"};if(SHA)body.sha=SHA;
+      var res=await api("/contents/jobs.json",{method:"PUT",body:JSON.stringify(body)});
+      if(res.ok){var d=await res.json();SHA=d.content.sha;JOBS=list;adminMsg="";drawJobs();drawAdmin();toast("Saved. Visitors will see it within a few minutes.");return true}
+      adminMsg=(res.status===401||res.status===403)?"Your owner key was not accepted or cannot write to this website.":(res.status===409||res.status===422)?"The list changed elsewhere. Reload this page and try again.":"Could not save. Please try again."
+    }catch(e){adminMsg="No connection. Please try again."}
+    drawJobs();drawAdmin();return false}
+  async function verify(){
+    try{
+      var res=await api("/contents/jobs.json?ref=main&t="+Date.now());
+      if(res.ok){var d=await res.json();JOBS=JSON.parse(dec(d.content)).jobs||[];SHA=d.sha;authed=true;adminMsg=""}
+      else if(res.status===404){var rr=await api("?t="+Date.now());var info=rr.ok?await rr.json():null;
+        if(info&&info.permissions&&info.permissions.push){JOBS=[];SHA=null;authed=true;adminMsg=""}else{authed=false;adminMsg="This key cannot write to this website. Check its repository and Contents permission."}}
+      else{authed=false;adminMsg="Key not accepted. Check it and try again."}
+    }catch(e){authed=false;adminMsg="No connection. Please try again."}
+    drawJobs();drawAdmin()}
+  function drawAdmin(){
+    var box=$("#admin");if(!box)return;box.textContent="";if(!manage)return;
+    var w=mk("div","admin");box.appendChild(w);
+    if(!repoInfo()){w.appendChild(mk("p","err","Posting jobs works from your GitHub Pages address."));return}
+    var msg=mk("span","err");msg.setAttribute("role","alert");msg.textContent=adminMsg;
+    if(!authed){
+      w.appendChild(mk("h3","","Owner sign-in"));w.appendChild(mk("p","lede","Paste your owner key to post or remove jobs. It stays on this phone only."));
+      var f=document.createElement("form");f.noValidate=true;
+      f.innerHTML='<label>Owner key<input type="password" autocomplete="off" name="k"></label><button class="btn pri" type="submit">Sign in</button>';
+      f.insertBefore(msg,f.lastChild);
+      f.onsubmit=function(e){e.preventDefault();var v=f.elements.k.value.trim();if(!v){adminMsg="Paste your owner key first.";drawAdmin();return}KEY=v;try{localStorage.setItem("kf_key",v)}catch(x){}adminMsg="Checking\u2026";drawAdmin();verify()};
+      w.appendChild(f);return}
+    w.appendChild(mk("h3","","Post a new job"));w.appendChild(mk("p","lede","Only you can see this panel. A posted job appears for visitors within a few minutes."));
+    var f2=document.createElement("form");f2.noValidate=true;
+    f2.innerHTML='<label>Job title<input name="title" autocomplete="off"></label><div class="two"><label>Location<input name="loc" value="Oddanchatram"></label><label>Job type<select name="type"><option>Full-time</option><option>Part-time</option><option>Contract</option><option>Internship</option><option>Volunteer</option></select></label></div><label>What the job involves<textarea name="desc"></textarea></label><label>Requirements (optional)<textarea name="req"></textarea></label><label>Last date to apply (optional)<input name="last" type="date"></label><button class="btn pri" type="submit">Post job</button>';
+    f2.insertBefore(msg,f2.lastChild);
+    f2.onsubmit=async function(e){e.preventDefault();var v=function(n){return f2.elements[n].value.trim()};
+      if(!v("title")||!v("desc")){adminMsg="Add a job title and a short description.";drawAdmin();return}
+      var b=f2.querySelector("button");b.disabled=true;b.textContent="Posting\u2026";
+      await save([{id:"j"+Date.now(),title:v("title"),loc:v("loc"),type:v("type"),desc:v("desc"),req:v("req"),last:v("last")}].concat(JOBS))};
+    w.appendChild(f2);
+    var so=mk("button","btn ghost","Sign out");so.type="button";so.style.marginTop="16px";so.onclick=function(){KEY=null;authed=false;try{localStorage.removeItem("kf_key")}catch(x){}adminMsg="";drawAdmin();drawJobs()};w.appendChild(so)}
+  function openings(m){
+    manage=m;if(!loaded){loaded=true;loadJobs()}
+    if(m&&KEY&&!authed&&repoInfo()){verify();return}
+    drawJobs();drawAdmin()}
   // careers page as its own view (hash #careers)
   var first=true,wasCareers=false;
   function route(){
-    var h=location.hash.slice(1),c=h==="careers";
+    var h=location.hash.slice(1),m=h==="manage",c=h==="careers"||m;
     $("#home").hidden=c;$("#careers-page").hidden=!c;
     links.forEach(function(l){l.classList.toggle("on",c&&l.getAttribute("href")==="#careers")});
     document.title=c?"Careers | Kiruba Foundation":"Kiruba Foundation | Sustainable agriculture in Oddanchatram";
     if(c){window.scrollTo(0,0)}
     else if(wasCareers||first){var t=h&&h!=="top"?document.getElementById(h):null;if(t)t.scrollIntoView();else window.scrollTo(0,0)}
-    wasCareers=c;first=false}
+    if(c)openings(m);wasCareers=c;first=false}
   window.addEventListener("hashchange",route);route();
 
   // career interest chips + application form
